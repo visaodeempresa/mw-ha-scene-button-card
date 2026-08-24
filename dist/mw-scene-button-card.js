@@ -21,7 +21,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "0.2.1";
+  const VERSION = "0.2.2";
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -526,6 +526,14 @@
       if (!this.shadowRoot) this.attachShadow({ mode: "open" });
       // Mesma geometria do custom:button-card e do MW Simple Button: os três
       // têm que ficar idênticos lado a lado em qualquer tamanho de grade.
+      //
+      // ARMADILHA DO QUADRADO: `height:100%` VENCE o `aspect-ratio`. Numa grade
+      // `square: true` a célula já é quadrada e ninguém percebe — mas quando a
+      // fileira tem UMA linha só (é o que acontece quando os `conditional`
+      // esconderam metade dos botões), a coluna estica a célula na altura e o
+      // botão virava retângulo. Por isso a altura é `auto`: quem manda é a
+      // razão de aspecto, e o `max-height` só existe para o caso oposto
+      // (célula mais baixa que larga), onde é melhor achatar que transbordar.
       this.shadowRoot.innerHTML = `
         <style>
           @keyframes sbc-spin{from{transform:rotate(0deg) translateZ(0);}to{transform:rotate(360deg) translateZ(0);}}
@@ -536,7 +544,7 @@
             text-align:center;padding:4% 0;overflow:hidden;
             -webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;
             transition:background .2s ease,box-shadow .2s ease,transform .12s ease,filter .12s ease;
-            height:100%;width:100%;box-sizing:border-box;}
+            width:100%;height:auto;max-height:100%;box-sizing:border-box;}
           .ct{display:grid;width:100%;height:100%;text-align:center;align-items:center;
             ${layout.grid}${gap ? `gap:${gap};` : ""}}
           .ic{grid-area:i;display:flex;position:relative;overflow:hidden;

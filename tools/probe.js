@@ -242,6 +242,15 @@ if (mainName) {
   check("com tamanho explícito o desenho preenche a caixa (--mdc-icon-size:100%)",
     emPapel.includes("--mdc-icon-size:100%"));
 
+
+  // o botão tem que continuar quadrado mesmo quando a célula esticar: numa
+  // fileira de UMA linha (conditional esconde metade) a coluna estica a altura
+  // (a regra do `.ic` tem height:100% de propósito — a que importa aqui é a do
+  // ha-card, e é ela que o teste procura, inteirinha)
+  check("o quadrado se defende: no ha-card a razão de aspecto vence a altura",
+    emPapel.includes("aspect-ratio:1/1")
+      && emPapel.includes("width:100%;height:auto;max-height:100%"));
+
   const sumida = desenha({ entity: "scene.sumiu", icon_unavailable: "mdi:cancel" });
   check("cena desabilitada (fora do states) idem", sumida.includes('icon="mdi:cancel"'));
 }
