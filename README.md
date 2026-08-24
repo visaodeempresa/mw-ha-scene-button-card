@@ -38,11 +38,20 @@ Aqui isso é o comportamento normal, não um defeito a contornar:
 
 | o problema | como este card resolve |
 |---|---|
+| a barra inteira nasce afundada e escura | **o botão de cena nasce aceso** — cena é ação, não interruptor |
 | ícone de ligado que nunca aparece | **um** ícone (`icon`), sempre visível |
-| ícone apagado é branco fixo | `color_icon` / `color_icon_on` no editor — sem `card_mod` |
-| cena não devolve estado nenhum | **pulso de papel** (`flash`) ao ativar: o dedo sabe que valeu |
-| o botão devia refletir o aparelho | `state_entity` opcional — a tomada é que acende o papel |
+| ícone apagado é branco fixo | `color_icon` no editor — sem `card_mod` |
+| cena não devolve estado nenhum | **aperto do papel** (`flash`) ao ativar: o dedo sabe que valeu |
+| o botão devia refletir o aparelho | `state_entity` opcional — aí a tomada desligada apaga o papel |
 | achar a cena certa entre 70+ | lista **agrupada por área**, com filtro |
+
+### Quando o papel apaga
+
+Só em duas situações, e as duas são de verdade:
+
+1. a cena está **indisponível** ou foi **desabilitada** — vem o ícone de
+   indisponível, com o rótulo riscado;
+2. você deu um **`state_entity`** e ele está desligado.
 
 ## A lista de cenas
 
@@ -72,10 +81,10 @@ inteiro** — como o nome costuma começar por emoji, as famílias (❄️ ar,
 | `icon` | `mdi:play` | o ícone — num botão de cena é este que aparece **sempre** |
 | `state_entity` | — | entidade que dá estado ao botão (a tomada, a luz…) |
 | `state_on` | `on` | valor de `state_entity` que acende o papel |
-| `icon_on` | — | ícone quando `state_entity` está ligado |
-| `flash` | `true` | pulso de papel ao ativar a cena |
+| `icon_off` | — | ícone quando `state_entity` está **desligado** |
+| `flash` | `true` | aperto do papel ao ativar a cena |
 | `transition` | — | segundos de transição passados ao `scene.turn_on` |
-| `color_icon` / `color_icon_on` | — | a cor do ícone em cada estado |
+| `color_icon` / `color_icon_off` | — | a cor do ícone (a segunda só com `state_entity`) |
 | `paper_color` | `paper` | 1 dos 49 papéis encardidos (7 matizes × 7 tons) |
 | `confirm` · `confirm_3d` · `confirm_paper_*` | `false` | balão de confirmação em papel |
 | `hide_label` · `name_position` · `icon_size` · `name_size` · `name_gap` | — | geometria |
@@ -87,7 +96,7 @@ Cores de estado (`color_on_name`, `color_off_name`, `color_off_bg`,
 
 ## Toque
 
-- **tap** — `scene.turn_on` na cena, vibração e pulso de papel;
+- **tap** — `scene.turn_on` na cena, vibração e aperto do papel;
 - **hold (500 ms)** — `more-info` do `state_entity` quando existe, senão da
   própria cena (a caixa da cena só mostra o carimbo de tempo).
 

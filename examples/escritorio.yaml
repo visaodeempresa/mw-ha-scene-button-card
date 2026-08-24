@@ -74,13 +74,14 @@ cards:
       color_icon: rgba(0, 100, 0, 0.8)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# O MESMO, sem `conditional`: com `state_entity` o botão acende o papel quando
-# a tomada está ligada — e a fileira para de sumir e aparecer.
+# O MESMO, sem `conditional`: o botão de cena já nasce aceso, e com
+# `state_entity` ele APAGA quando a tomada está desligada — a fileira para de
+# sumir e aparecer.
 #
 #   - type: custom:mw-scene-button-card
 #     entity: scene.ligar_climatizador_escritorio
 #     state_entity: switch.tomada_climatizador_do_escritorio_socket_1
 #     name: CLIMAT
 #     icon: mdi:play
-#     icon_on: mdi:fan
+#     icon_off: mdi:power-plug-off
 #     color_icon: rgba(0, 100, 0, 0.8)
