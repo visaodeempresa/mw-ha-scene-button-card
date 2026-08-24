@@ -234,6 +234,14 @@ if (mainName) {
   check("cena indisponível cai no ícone de indisponível", morta.includes('icon="mdi:cancel"'));
   check("cena indisponível não fica de papel", !morta.includes(PAPEL));
 
+
+  const emPapel = desenha({ entity: "scene.ar", icon: "mdi:play", hide_label: true, icon_size: "46%" });
+  // 46% do botão é a medida dos botões do MW Humidifier — é assim que as duas
+  // barras ficam do mesmo tamanho lado a lado
+  check("icon_size aceita porcentagem do botão", emPapel.includes("width:46%"));
+  check("com tamanho explícito o desenho preenche a caixa (--mdc-icon-size:100%)",
+    emPapel.includes("--mdc-icon-size:100%"));
+
   const sumida = desenha({ entity: "scene.sumiu", icon_unavailable: "mdi:cancel" });
   check("cena desabilitada (fora do states) idem", sumida.includes('icon="mdi:cancel"'));
 }

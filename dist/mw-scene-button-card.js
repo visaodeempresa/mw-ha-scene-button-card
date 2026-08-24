@@ -21,7 +21,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "0.2.0";
+  const VERSION = "0.2.1";
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -507,9 +507,14 @@
       const gap = px(c.name_gap);
       const nameSize = px(c.name_size) || "11px";
       const isz = px(c.icon_size);
+      // `icon_size` aceita px ("32", "32px") E porcentagem do botão ("46%") —
+      // é assim que este botão fica do mesmo tamanho dos do MW Humidifier, que
+      // desenha o ícone a 46% do quadrado. O `--mdc-icon-size` é sempre 100%:
+      // quem manda no tamanho é a caixa, e o desenho preenche a caixa. Pôr a
+      // porcentagem no --mdc-icon-size deixava o ícone minúsculo.
       const iconBox = isz
         ? `position:relative;width:${isz};height:${isz};max-height:${isz};
-            --mdc-icon-size:${isz};--iron-icon-width:${isz};--iron-icon-height:${isz};`
+            --mdc-icon-size:100%;--iron-icon-width:100%;--iron-icon-height:100%;`
         : `position:absolute;width:100%;height:100%;max-height:100%;
             --mdc-icon-size:100%;--iron-icon-width:100%;--iron-icon-height:100%;`;
 
@@ -637,7 +642,7 @@
     hide_label: "Esconder o label (só o ícone, centralizado)",
     paper_color: "Cor do papel",
     name_position: "Posição do label",
-    icon_size: "Tamanho do ícone (vazio = automático)",
+    icon_size: "Tamanho do ícone — px ou % do botão (vazio = enche o botão)",
     name_size: "Tamanho do texto do label",
     name_gap: "Distância entre label e ícone",
     color_on_name: "Texto",
@@ -720,7 +725,8 @@
         ] : []),
         { name: "paper_color", selector: { select: { mode: "dropdown", options: paperOptions() } } },
         { name: "hide_label", selector: { boolean: {} } },
-        { name: "icon_size", selector: { number: { min: 8, max: 200, step: 1, mode: "box", unit_of_measurement: "px" } } },
+        // texto, não número: o valor útil aqui é tanto "32" (px) quanto "46%"
+        { name: "icon_size", selector: { text: {} } },
         ...labelFields,
       ];
     }
