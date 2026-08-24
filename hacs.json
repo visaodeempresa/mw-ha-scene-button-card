@@ -1,0 +1,6 @@
+{
+  "name": "MW Scene Button Card",
+  "filename": "mw-scene-button-card.js",
+  "render_readme": true,
+  "homeassistant": "2024.4.0"
+}

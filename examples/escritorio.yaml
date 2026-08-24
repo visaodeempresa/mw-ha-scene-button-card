@@ -1,0 +1,86 @@
+# Escritório — a fileira de cenas do climatizador e do ar-condicionado.
+#
+# ANTES: cada botão era um `type: button` dentro de um `conditional`, com
+# `tap_action: toggle` numa cena e um `card_mod` só para pintar o ícone.
+# DEPOIS: o `conditional` continua sendo quem esconde/mostra (isso é papel da
+# grade, não do botão), mas o botão já sabe ser cena — e a cor do ícone é campo
+# do editor.
+
+square: true
+type: grid
+columns: 4
+cards:
+  # ── desligado: só o botão de ligar ────────────────────────────────────────
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: switch.tomada_climatizador_do_escritorio_socket_1
+        state: "off"
+    card:
+      type: custom:mw-scene-button-card
+      entity: scene.ligar_climatizador_escritorio
+      name: CLIMAT
+      icon: mdi:play
+      color_icon: rgba(0, 100, 0, 0.8)
+
+  # ── ligado: desligar + os três ajustes ────────────────────────────────────
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: switch.tomada_climatizador_do_escritorio_socket_1
+        state: "on"
+    card:
+      type: custom:mw-scene-button-card
+      entity: scene.desligar_climatizador_escritorio
+      name: DESLIG.
+      icon: mdi:stop
+      color_icon: red
+      color_off_name: red
+
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: switch.tomada_climatizador_do_escritorio_socket_1
+        state: "on"
+    card:
+      type: custom:mw-scene-button-card
+      entity: scene.velocidade_do_climatizador_do_escritorio
+      name: VELOC.
+      icon: mdi:fan-speed-1
+      color_icon: rgba(0, 100, 0, 0.8)
+
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: switch.tomada_climatizador_do_escritorio_socket_1
+        state: "on"
+    card:
+      type: custom:mw-scene-button-card
+      entity: scene.modo_do_climatizador_do_escritorio
+      name: MODO
+      icon: mdi:fan-auto
+      color_icon: rgba(0, 100, 0, 0.8)
+
+  - type: conditional
+    conditions:
+      - condition: state
+        entity: switch.tomada_climatizador_do_escritorio_socket_1
+        state: "on"
+    card:
+      type: custom:mw-scene-button-card
+      entity: scene.oscilar_o_climatizador_do_escritorio
+      name: BAL
+      icon: mdi:fan-auto
+      color_icon: rgba(0, 100, 0, 0.8)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# O MESMO, sem `conditional`: com `state_entity` o botão acende o papel quando
+# a tomada está ligada — e a fileira para de sumir e aparecer.
+#
+#   - type: custom:mw-scene-button-card
+#     entity: scene.ligar_climatizador_escritorio
+#     state_entity: switch.tomada_climatizador_do_escritorio_socket_1
+#     name: CLIMAT
+#     icon: mdi:play
+#     icon_on: mdi:fan
+#     color_icon: rgba(0, 100, 0, 0.8)
