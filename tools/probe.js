@@ -283,7 +283,7 @@ if (mainName) {
   check("show_when esconde o que não é para aparecer",
     !h.includes('icon="mdi:stop"') && h.includes('icon="mdi:fan"'));
   check("botão sem show_when aparece sempre", h.includes('icon="mdi:play"'));
-  check("sem icon_size a fileira usa os 46% do umidificador", h.includes("width:46%"));
+  check("sem icon_size a fileira usa os 65% da casa", h.includes("width:65%"));
   check("recusa item que não é cena", (() => {
     try { new reg[mainName]().setConfig({ buttons: [{ entity: "light.x" }] }); return false; }
     catch (_) { return true; }

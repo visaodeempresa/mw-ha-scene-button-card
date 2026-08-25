@@ -53,6 +53,42 @@ Só em duas situações, e as duas são de verdade:
    indisponível, com o rótulo riscado;
 2. você deu um **`state_entity`** e ele está desligado.
 
+## Fileira: N botões num card só
+
+Quatro botões dentro de um `type: grid` do HA **nunca** ficam com o mesmo
+espaço entre si que os botões do [MW Humidifier](https://github.com/visaodeempresa/mw-ha-humidifier-card),
+e o culpado não é o `gap`: com `square: true` a grade do HA usa
+`grid-auto-rows: 1fr`, e da segunda linha em diante a linha estica para
+preencher a altura sobrada da coluna.
+
+Por isso o card também sabe **ser** a grade:
+
+```yaml
+type: custom:mw-scene-button-card
+button_columns: 2
+gap: 8                 # px, o mesmo do MW Humidifier
+hide_label: true
+icon_size: 46%
+buttons:
+  - entity: scene.ligar_climatizador_escritorio
+    icon: mdi:play
+    color_icon: rgba(0, 100, 0, 0.8)
+    paper_color: green-6
+    show_when: { entity: switch.tomada_climatizador, state: "off" }
+  - entity: scene.desligar_climatizador_escritorio
+    icon: mdi:stop
+    color_icon: red
+    paper_color: red-6
+    show_when: { entity: switch.tomada_climatizador, state: "on" }
+```
+
+O que está no card vale para todos os botões; o que está no item vence.
+`show_when: {entity, state}` substitui o `type: conditional` por botão — e
+`state` aceita uma lista.
+
+**A fileira se edita pelo YAML.** O editor visual mexe em um botão só e
+apagaria a lista, então ele se recusa e explica.
+
 ## A lista de cenas
 
 O seletor de entidade do HA mostra cena por nome, tudo misturado. Aqui o campo
