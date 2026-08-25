@@ -21,7 +21,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "0.3.0";
+  const VERSION = "0.3.1";
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -607,8 +607,12 @@
           : isOn && c.icon_shadow !== false
             ? "drop-shadow(1px 2px 2px rgba(0,0,0,0.55)) drop-shadow(3px 6px 8px rgba(0,0,0,0.30)) drop-shadow(6px 12px 16px rgba(0,0,0,0.15))"
             : "none",
-        // na fileira o ícone é sempre uma caixa: sem medida, a do umidificador
-        isz: px(c.icon_size) || "46%",
+        // Na fileira o ícone é sempre uma caixa. Sem medida, a MEDIDA DA CASA:
+        // 65% do botão — o meio-termo entre os 46% que o MW Humidifier trazia
+        // de fábrica e os 85% que o dono tinha afinado na barra de cenas. Com
+        // 46% o desenho fica pequeno num botão grande; com 85% ele encosta na
+        // borda. Decidido na tela, em 25/08/2026.
+        isz: px(c.icon_size) || "65%",
       };
     }
 
