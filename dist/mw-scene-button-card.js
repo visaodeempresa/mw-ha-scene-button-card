@@ -21,7 +21,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "0.2.2";
+  const VERSION = "0.3.0";
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -370,6 +370,12 @@
   // <<< mw-scene-picker v1
 
   const DEFAULTS = {
+    // --- fileira: N botões numa grade PRÓPRIA (ver _renderPack) ---
+    buttons: [],               // vazio = card de um botão só
+    button_columns: 2,
+    gap: 8,                    // px entre botões — o mesmo do MW Humidifier
+    button_radius: 12,
+
     name: "",
     // num botão de CENA quem aparece é sempre este ícone; só um `state_entity`
     // apagado troca por outro
@@ -419,15 +425,43 @@
 
   class SceneButtonCard extends HTMLElement {
     setConfig(config) {
-      if (!config || !config.entity) {
+      const lista = Array.isArray(config && config.buttons) ? config.buttons : [];
+      if (lista.length) {
+        lista.forEach((b, i) => {
+          if (!b || String(b.entity || "").indexOf("scene.") !== 0) {
+            throw new Error(`mw-scene-button-card: buttons[${i}] precisa de uma cena (scene.*)`);
+          }
+        });
+      } else if (!config || !config.entity) {
         throw new Error("mw-scene-button-card: escolha a cena no campo 'entity'");
-      }
-      if (String(config.entity).indexOf("scene.") !== 0) {
+      } else if (String(config.entity).indexOf("scene.") !== 0) {
         throw new Error("mw-scene-button-card: 'entity' tem que ser uma cena (scene.*)");
       }
       this._config = { ...DEFAULTS, ...config };
       this._renderKey = null;
       if (this._hass) this._render();
+    }
+
+    // configuração de UM botão da fileira: o que está no card vale para todos,
+    // o que está no item vence. As chaves da fileira não descem para o botão.
+    _cfgDe(b) {
+      const c = { ...this._config, ...b };
+      delete c.buttons; delete c.button_columns; delete c.gap; delete c.button_radius;
+      return c;
+    }
+
+    // `show_when` é o `type: conditional` embutido: sem ele a fileira precisaria
+    // de um conditional POR BOTÃO, e é justamente o conditional que faz a grade
+    // do HA ter uma linha só e esticar (ver o comentário da geometria)
+    _visivel(b) {
+      const w = b && b.show_when;
+      if (!w || !w.entity) return true;
+      const st = this._hass.states[w.entity];
+      const atual = st ? String(st.state) : "unavailable";
+      const querida = w.state === undefined ? "on" : w.state;
+      return Array.isArray(querida)
+        ? querida.map(String).includes(atual)
+        : String(querida) === atual;
     }
 
     set hass(hass) {
@@ -437,19 +471,29 @@
       // a cena guarda carimbo de tempo, não estado: o que muda o desenho é o
       // state_entity (quando existe). Sem ele o botão só repinta se a cena
       // aparecer/sumir — e é assim que ele fica O(1) numa tela cheia.
-      const sc = hass.states[c.entity];
-      const viva = !!sc && sc.state !== "unavailable" && sc.state !== "unknown";
-      const st = c.state_entity ? hass.states[c.state_entity] : null;
       // o carimbo de tempo da cena NÃO entra na chave de propósito: ativar a
       // cena mudaria o state e o redesenho comeria o aperto do papel
-      const key = `${viva ? 1 : 0}|${st ? st.state : "·"}`;
+      const viva = (id) => {
+        const x = hass.states[id];
+        return x && x.state !== "unavailable" && x.state !== "unknown" ? 1 : 0;
+      };
+      const olho = (id) => (id && hass.states[id] ? hass.states[id].state : "·");
+      const key = c.buttons.length
+        ? c.buttons.map((b) => `${viva(b.entity)}${olho(b.state_entity || c.state_entity)}`
+            + `${olho(b.show_when && b.show_when.entity)}`).join("|")
+        : `${viva(c.entity)}|${olho(c.state_entity)}`;
       if (key !== this._renderKey) {
         this._renderKey = key;
         this._render();
       }
     }
 
-    getCardSize() { return 2; }
+    getCardSize() {
+      const n = this._config?.buttons?.length || 0;
+      if (!n) return 2;
+      const cols = Math.max(1, Number(this._config.button_columns) || 2);
+      return Math.ceil(n / cols) * 2;
+    }
 
     disconnectedCallback() { clearTimeout(this._flashTimer); }
 
@@ -461,40 +505,117 @@
     }
 
     _render() {
+      if (this._config.buttons.length) return this._renderPack();
+      return this._renderUm();
+    }
+
+    /* ---------------------------------------------------------------------
+     * FILEIRA (N botões num card só) — POR QUE ISSO EXISTE
+     *
+     * Quatro botões dentro de um `type: grid` do HA NÃO ficam com o mesmo
+     * espaço entre si que os botões do MW Humidifier, e não é culpa do gap:
+     * `hui-grid-card` com `square: true` põe `grid-auto-rows: 1fr` nas linhas
+     * implícitas (fonte do frontend, hui-grid-card.ts). A primeira linha é
+     * quadrada por um `::before` com `padding-bottom:100%`; da segunda em
+     * diante a linha ESTICA para preencher a altura sobrada da coluna — que a
+     * foto do aparelho ao lado dita. O botão continua quadrado (aspect-ratio),
+     * então a sobra vira vão vertical maior que o horizontal. `align-content`
+     * não conserta: trilha `1fr` não é auto, e `card_mod` nem chega ali (o
+     * grid card não tem `ha-card`).
+     *
+     * O umidificador não sofre porque é UM card que desenha a própria grade,
+     * com `align-content: start`. Esta fileira é a mesma construção — mesmo
+     * gap, mesmo raio, mesma razão de aspecto — e por isso as duas barras da
+     * tela ficam idênticas.
+     * ------------------------------------------------------------------ */
+    _renderPack() {
       const c = this._config;
+      const cols = Math.max(1, Number(c.button_columns) || 2);
+      const gap = Number(c.gap) || 0;
+      const raio = Number.isFinite(Number(c.button_radius)) ? Number(c.button_radius) : 12;
+      this._itens = c.buttons.filter((b) => this._visivel(b));
+
+      const celulas = this._itens.map((b, i) => {
+        const cb = this._cfgDe(b);
+        const v = this._visual(cb);
+        const nome = cb.hide_label === true ? "" : (cb.name
+          || this._hass.states[cb.entity]?.attributes?.friendly_name || cb.entity);
+        return `<div class="btn" data-i="${i}" style="background:${v.bg};border:1px solid ${v.border};
+            box-shadow:${v.shadow};border-radius:${raio}px;color:${v.nameColor};">
+          <ha-icon icon="${esc(v.icon)}" style="width:${v.isz};height:${v.isz};
+            --mdc-icon-size:100%;color:${v.iconColor};filter:${v.iconFilter};
+            ${cb.control === false ? "opacity:.6;transform:scale(.88);" : ""}"></ha-icon>
+          ${nome ? `<span class="bn${v.dead ? " morto" : ""}">${esc(nome)}</span>` : ""}
+        </div>`;
+      }).join("");
+
+      if (!this.shadowRoot) this.attachShadow({ mode: "open" });
+      this.shadowRoot.innerHTML = `
+        <style>
+          /* sem ha-card: a fileira é transparente e quem tem papel é o botão */
+          .btns{display:grid;grid-template-columns:repeat(${cols},1fr);gap:${gap}px;
+            align-content:start;min-width:0;min-height:0;}
+          .btn{position:relative;aspect-ratio:1 / 1;container-type:size;
+            min-width:0;min-height:0;display:flex;flex-direction:column;
+            align-items:center;justify-content:center;gap:2%;box-sizing:border-box;
+            overflow:hidden;font-weight:600;cursor:pointer;
+            -webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;
+            transition:background .2s ease,box-shadow .2s ease,transform .12s ease,filter .12s ease;}
+          .btn ha-icon{display:flex;align-items:center;justify-content:center;flex:none;
+            transition:color .2s ease;}
+          .btn .bn{font-size:10cqw;font-weight:600;line-height:1.1;max-width:92%;
+            text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+          .btn .morto{text-decoration:line-through;}
+        </style>
+        <div class="btns">${celulas}</div>`;
+
+      this.shadowRoot.querySelectorAll(".btn").forEach((el) => {
+        this._ligar(el, this._cfgDe(this._itens[Number(el.dataset.i)]));
+      });
+    }
+
+    // A pele de UM botão: as mesmas contas para o card sozinho e para cada
+    // célula da fileira — é o que garante que os dois modos sejam idênticos.
+    _visual(c) {
       const sc = this._hass.states[c.entity];
       // cena desabilitada some do `states`; cena que existe pode estar
       // indisponível. Fora esses dois casos, botão de cena é sempre papel.
       const dead = !sc || sc.state === "unavailable" || sc.state === "unknown";
       const stEnt = c.state_entity ? this._hass.states[c.state_entity] : null;
-      // sem state_entity o botão é ação pura: vive apagado e só acende no pulso
       // POR QUE O PADRÃO É ACESO: cena não é interruptor — é ação. Não existe
       // "cena desligada", então nascer afundado era mentira de estado. Só quem
       // pede explicitamente um `state_entity` vê o botão apagar.
       const isOn = dead ? false
         : c.state_entity ? (!!stEnt && String(stEnt.state) === String(c.state_on))
         : true;
+      return {
+        sc, dead, isOn,
+        bg: isOn ? paperGradient(c.paper_color) : c.color_off_bg,
+        border: isOn ? c.color_on_border : c.color_off_border,
+        shadow: isOn
+          ? "0 0 8px 2px rgba(0,0,0,0.28), 0 4px 10px rgba(0,0,0,0.14), inset 2px 2px 4px rgba(255,250,235,0.80), inset -2px -2px 4px rgba(0,0,0,0.08)"
+          : "inset 2px 2px 5px rgba(0,0,0,0.35), inset -1px -1px 3px rgba(255,255,255,0.04)",
+        icon: dead ? c.icon_unavailable
+          : (!isOn && c.icon_off) ? c.icon_off
+          : (c.icon || sc?.attributes?.icon || "mdi:play"),
+        nameColor: dead ? c.color_unavail : isOn ? c.color_on_name : c.color_off_name,
+        iconColor: dead ? c.color_unavail
+          : isOn ? (c.color_icon || c.color_on_name)
+          : (c.color_icon_off || "rgba(255,255,255,0.70)"),
+        iconFilter: dead
+          ? "drop-shadow(0 0 2px rgba(200,0,0,1.0)) drop-shadow(0 0 8px rgba(220,0,0,0.95)) drop-shadow(0 0 18px rgba(200,0,0,0.80)) drop-shadow(0 0 32px rgba(180,0,0,0.55))"
+          : isOn && c.icon_shadow !== false
+            ? "drop-shadow(1px 2px 2px rgba(0,0,0,0.55)) drop-shadow(3px 6px 8px rgba(0,0,0,0.30)) drop-shadow(6px 12px 16px rgba(0,0,0,0.15))"
+            : "none",
+        // na fileira o ícone é sempre uma caixa: sem medida, a do umidificador
+        isz: px(c.icon_size) || "46%",
+      };
+    }
 
-      const bg = isOn ? paperGradient(c.paper_color) : c.color_off_bg;
-      const border = isOn ? c.color_on_border : c.color_off_border;
-      const shadow = isOn
-        ? "0 0 8px 2px rgba(0,0,0,0.28), 0 4px 10px rgba(0,0,0,0.14), inset 2px 2px 4px rgba(255,250,235,0.80), inset -2px -2px 4px rgba(0,0,0,0.08)"
-        : "inset 2px 2px 5px rgba(0,0,0,0.35), inset -1px -1px 3px rgba(255,255,255,0.04)";
-
-      const icon = dead ? c.icon_unavailable
-        : (!isOn && c.icon_off) ? c.icon_off
-        : (c.icon || sc?.attributes?.icon || "mdi:play");
-
-      const nameColor = dead ? c.color_unavail : isOn ? c.color_on_name : c.color_off_name;
-      const iconColor = dead ? c.color_unavail
-        : isOn ? (c.color_icon || c.color_on_name)
-        : (c.color_icon_off || "rgba(255,255,255,0.70)");
-
-      const iconFilter = dead
-        ? "drop-shadow(0 0 2px rgba(200,0,0,1.0)) drop-shadow(0 0 8px rgba(220,0,0,0.95)) drop-shadow(0 0 18px rgba(200,0,0,0.80)) drop-shadow(0 0 32px rgba(180,0,0,0.55))"
-        : isOn && c.icon_shadow !== false
-          ? "drop-shadow(1px 2px 2px rgba(0,0,0,0.55)) drop-shadow(3px 6px 8px rgba(0,0,0,0.30)) drop-shadow(6px 12px 16px rgba(0,0,0,0.15))"
-          : "none";
+    _renderUm() {
+      const c = this._config;
+      const v = this._visual(c);
+      const { sc, dead, isOn, bg, border, shadow, icon, nameColor, iconColor, iconFilter } = v;
 
       const spin = c.animate && isOn ? "animation:sbc-spin 1.2s linear infinite;" : "";
       const canControl = c.control !== false;
@@ -566,11 +687,20 @@
           </div>
         </ha-card>`;
 
-      // tap = ativa a cena · hold (500 ms) = more-info (do state_entity quando
-      // existe — a caixa de diálogo da cena só mostra o carimbo de tempo).
+      this._ligar(this.shadowRoot.querySelector("ha-card"), c);
+    }
+
+    // tap = ativa a cena · hold (500 ms) = more-info (do state_entity quando
+    // existe — a caixa de diálogo da cena só mostra o carimbo de tempo).
+    // `alvo` é o elemento que recebe o toque E o aperto do papel: no card
+    // sozinho é o próprio ha-card; na fileira, cada célula.
+    _ligar(card, c) {
+      const v = this._visual(c);
+      const dead = v.dead;
+      const sc = v.sc;
+      const canControl = c.control !== false;
       const buzz = c.haptic !== false;
       const info = c.state_entity || c.entity;
-      const card = this.shadowRoot.querySelector("ha-card");
       let holdTimer = null, held = false;
       card.addEventListener("pointerdown", () => {
         held = false;
@@ -604,7 +734,7 @@
         }
         this._hass.callService("scene", "turn_on", data);
         if (buzz) haptic("success");
-        this._pulse();
+        this._pulse(card, c);
       });
     }
 
@@ -613,9 +743,9 @@
     // O papel já está aceso — o retorno do toque não pode ser "acender". É o
     // APERTO: a folha afunda um tico e clareia, e volta. Mexe só no estilo
     // inline, sem redesenhar, senão o próximo `hass` apagaria o efeito.
-    _pulse() {
-      if (this._config.flash === false) return;
-      const el = this.shadowRoot && this.shadowRoot.querySelector("ha-card");
+    _pulse(el, c) {
+      if ((c || this._config).flash === false) return;
+      el = el || (this.shadowRoot && this.shadowRoot.querySelector("ha-card"));
       if (!el) return;
       clearTimeout(this._flashTimer);
       el.style.filter = "brightness(1.22)";
@@ -682,7 +812,31 @@
   class SceneButtonCardEditor extends HTMLElement {
     setConfig(config) {
       this._config = { ...config };
+      // MODO FILEIRA: o editor visual editaria UM botão e, ao devolver a
+      // config, comeria a lista inteira. Enquanto não existir editor de
+      // fileira, ele se recusa a mexer — e diz por quê.
+      if (Array.isArray(this._config.buttons) && this._config.buttons.length) {
+        this._renderAviso();
+        return;
+      }
       this._renderAll();
+    }
+
+    _renderAviso() {
+      if (!this._aviso) {
+        this._aviso = document.createElement("div");
+        this.appendChild(this._aviso);
+      }
+      const n = this._config.buttons.length;
+      this._aviso.innerHTML = `
+        <div style="padding:12px 14px;border:1px solid var(--divider-color,#444);
+             border-radius:8px;font-size:13px;line-height:1.5;">
+          <b>Fileira de ${n} botões de cena.</b><br>
+          Esta é a construção que iguala o espaçamento ao dos botões do
+          MW Humidifier: a grade é do card, não do <code>type: grid</code> do HA.
+          Por enquanto ela se edita <b>pelo YAML</b> — o editor visual mexe em um
+          botão só e apagaria a lista.
+        </div>`;
     }
 
     set hass(hass) {
