@@ -255,5 +255,40 @@ if (mainName) {
   check("cena desabilitada (fora do states) idem", sumida.includes('icon="mdi:cancel"'));
 }
 
+console.log("fileira (N botões num card só):");
+if (mainName) {
+  const fila = new reg[mainName]();
+  fila.setConfig({
+    button_columns: 2, gap: 8,
+    buttons: [
+      { entity: "scene.ar", icon: "mdi:play", color_icon: "green", hide_label: true },
+      { entity: "scene.ar", icon: "mdi:stop", show_when: { entity: "switch.tomada", state: "on" } },
+      { entity: "scene.ar", icon: "mdi:fan", show_when: { entity: "switch.tomada", state: "off" } },
+    ],
+  });
+  fila.hass = {
+    states: {
+      "scene.ar": { state: "2026-08-24T10:00:00+00:00", attributes: { friendly_name: "AR" } },
+      "switch.tomada": { state: "off", attributes: {} },
+    },
+    callService: () => {},
+  };
+  const h = String((fila.shadowRoot && fila.shadowRoot.innerHTML) || "");
+  check("a fileira desenha", h.includes("btns"));
+  // é ESTA linha que iguala o espaçamento ao dos botões do MW Humidifier:
+  // a grade do HA usa grid-auto-rows:1fr e estica a segunda linha
+  check("grade própria com align-content:start", h.includes("align-content:start"));
+  check("gap em px, igual ao do umidificador", h.includes("gap:8px"));
+  check("botão quadrado por aspect-ratio", h.includes("aspect-ratio:1 / 1"));
+  check("show_when esconde o que não é para aparecer",
+    !h.includes('icon="mdi:stop"') && h.includes('icon="mdi:fan"'));
+  check("botão sem show_when aparece sempre", h.includes('icon="mdi:play"'));
+  check("sem icon_size a fileira usa os 46% do umidificador", h.includes("width:46%"));
+  check("recusa item que não é cena", (() => {
+    try { new reg[mainName]().setConfig({ buttons: [{ entity: "light.x" }] }); return false; }
+    catch (_) { return true; }
+  })());
+}
+
 console.log(fails ? `\n${fails} verificação(ões) falharam` : "\ntudo ok");
 process.exit(fails ? 1 : 0);
