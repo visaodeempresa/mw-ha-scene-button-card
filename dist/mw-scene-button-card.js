@@ -421,6 +421,11 @@
     right: { grid: "grid-template-areas:'i n';grid-template-columns:1fr min-content;grid-template-rows:1fr;", edge: "padding-right:8px;" },
   };
 
+  // O que este card sabe disparar com UM toque. `scene` é a origem; `script`
+  // e `button` entraram para o MW Infrared, cuja tecla de IR é uma entidade
+  // `button.*`.
+  const DISPARAVEL = /^(scene|script|button)\./;
+
   const FLASH_MS = 320;
 
   class SceneButtonCard extends HTMLElement {
@@ -428,14 +433,14 @@
       const lista = Array.isArray(config && config.buttons) ? config.buttons : [];
       if (lista.length) {
         lista.forEach((b, i) => {
-          if (!b || String(b.entity || "").indexOf("scene.") !== 0) {
-            throw new Error(`mw-scene-button-card: buttons[${i}] precisa de uma cena (scene.*)`);
+          if (!b || !DISPARAVEL.test(String(b.entity || ""))) {
+            throw new Error(`mw-scene-button-card: buttons[${i}] precisa de scene.*, script.* ou button.*`);
           }
         });
       } else if (!config || !config.entity) {
         throw new Error("mw-scene-button-card: escolha a cena no campo 'entity'");
-      } else if (String(config.entity).indexOf("scene.") !== 0) {
-        throw new Error("mw-scene-button-card: 'entity' tem que ser uma cena (scene.*)");
+      } else if (!DISPARAVEL.test(String(config.entity))) {
+        throw new Error("mw-scene-button-card: 'entity' tem que ser scene.*, script.* ou button.*");
       }
       this._config = { ...DEFAULTS, ...config };
       this._renderKey = null;
@@ -733,10 +738,14 @@
           if (!ok) return;
         }
         const data = { entity_id: c.entity };
-        if (c.transition !== null && c.transition !== "" && c.transition !== undefined) {
+        const dom = String(c.entity).split(".")[0];
+        if (dom === "scene" && c.transition !== null && c.transition !== "" && c.transition !== undefined) {
           data.transition = Number(c.transition);
         }
-        this._hass.callService("scene", "turn_on", data);
+        // `button.*` e `script.*` entram para o controle por infravermelho
+        // (MW Infrared): a tecla é um toque só, exatamente como a cena — o
+        // que muda é o serviço, não o desenho nem o retorno do dedo.
+        this._hass.callService(dom, dom === "button" ? "press" : "turn_on", data);
         if (buzz) haptic("success");
         this._pulse(card, c);
       });
