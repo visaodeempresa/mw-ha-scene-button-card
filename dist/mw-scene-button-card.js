@@ -21,7 +21,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "0.4.0";
+  const VERSION = "0.5.0";
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -424,7 +424,7 @@
   // O que este card sabe disparar com UM toque. `scene` é a origem; `script`
   // e `button` entraram para o MW Infrared, cuja tecla de IR é uma entidade
   // `button.*`.
-  const DISPARAVEL = /^(scene|script|button)\./;
+  const DISPARAVEL = /^(scene|script|button|climate|switch)\./;
 
   const FLASH_MS = 320;
 
@@ -433,14 +433,14 @@
       const lista = Array.isArray(config && config.buttons) ? config.buttons : [];
       if (lista.length) {
         lista.forEach((b, i) => {
-          if (!b || !DISPARAVEL.test(String(b.entity || ""))) {
-            throw new Error(`mw-scene-button-card: buttons[${i}] precisa de scene.*, script.* ou button.*`);
+          if (!b || (!DISPARAVEL.test(String(b.entity || "")) && !b.tap_action)) {
+            throw new Error(`mw-scene-button-card: buttons[${i}] precisa de scene.*, script.*, button.* ou tap_action`);
           }
         });
       } else if (!config || !config.entity) {
         throw new Error("mw-scene-button-card: escolha a cena no campo 'entity'");
-      } else if (!DISPARAVEL.test(String(config.entity))) {
-        throw new Error("mw-scene-button-card: 'entity' tem que ser scene.*, script.* ou button.*");
+      } else if (!DISPARAVEL.test(String(config.entity)) && !config.tap_action) {
+        throw new Error("mw-scene-button-card: 'entity' tem que ser scene.*, script.*, button.* ou tap_action");
       }
       this._config = { ...DEFAULTS, ...config };
       this._renderKey = null;
@@ -480,7 +480,8 @@
       // cena mudaria o state e o redesenho comeria o aperto do papel
       const viva = (id) => {
         const x = hass.states[id];
-        return x && x.state !== "unavailable" && x.state !== "unknown" ? 1 : 0;
+        const isB = id && (id.startsWith("button.") || id.startsWith("input_button."));
+        return x && x.state !== "unavailable" && (x.state !== "unknown" || isB) ? 1 : 0;
       };
       const olho = (id) => (id && hass.states[id] ? hass.states[id].state : "·");
       const key = c.buttons.length
@@ -583,9 +584,11 @@
     // célula da fileira — é o que garante que os dois modos sejam idênticos.
     _visual(c) {
       const sc = this._hass.states[c.entity];
+      const isBtn = c.entity && (c.entity.startsWith("button.") || c.entity.startsWith("input_button."));
+      const isClim = c.entity && c.entity.startsWith("climate.");
       // cena desabilitada some do `states`; cena que existe pode estar
       // indisponível. Fora esses dois casos, botão de cena é sempre papel.
-      const dead = !sc || sc.state === "unavailable" || sc.state === "unknown";
+      const dead = !sc || sc.state === "unavailable" || (sc.state === "unknown" && !isBtn && !isClim && !c.entity.startsWith("scene."));
       const stEnt = c.state_entity ? this._hass.states[c.state_entity] : null;
       // POR QUE O PADRÃO É ACESO: cena não é interruptor — é ação. Não existe
       // "cena desligada", então nascer afundado era mentira de estado. Só quem
@@ -737,15 +740,33 @@
           });
           if (!ok) return;
         }
-        const data = { entity_id: c.entity };
-        const dom = String(c.entity).split(".")[0];
-        if (dom === "scene" && c.transition !== null && c.transition !== "" && c.transition !== undefined) {
-          data.transition = Number(c.transition);
+        if (c.tap_action) {
+          const act = c.tap_action.action || c.tap_action.perform_action;
+          if (act === "perform-action" || act === "call-service") {
+            const svc = c.tap_action.perform_action || c.tap_action.service || "";
+            const [svcDom, svcName] = svc.split(".");
+            if (svcDom && svcName) {
+              this._hass.callService(svcDom, svcName, c.tap_action.data || c.tap_action.service_data || {});
+            }
+          } else if (act === "more-info") {
+            this.dispatchEvent(new CustomEvent("hass-more-info", {
+              bubbles: true, composed: true,
+              detail: { entityId: c.tap_action.target?.entity_id || c.entity }
+            }));
+          } else if (act === "toggle") {
+            this._hass.callService("homeassistant", "toggle", { entity_id: c.entity });
+          }
+        } else {
+          const data = { entity_id: c.entity };
+          const dom = String(c.entity).split(".")[0];
+          if (dom === "scene" && c.transition !== null && c.transition !== "" && c.transition !== undefined) {
+            data.transition = Number(c.transition);
+          }
+          // `button.*` e `script.*` entram para o controle por infravermelho
+          // (MW Infrared): a tecla é um toque só, exatamente como a cena — o
+          // que muda é o serviço, não o desenho nem o retorno do dedo.
+          this._hass.callService(dom, dom === "button" ? "press" : "turn_on", data);
         }
-        // `button.*` e `script.*` entram para o controle por infravermelho
-        // (MW Infrared): a tecla é um toque só, exatamente como a cena — o
-        // que muda é o serviço, não o desenho nem o retorno do dedo.
-        this._hass.callService(dom, dom === "button" ? "press" : "turn_on", data);
         if (buzz) haptic("success");
         this._pulse(card, c);
       });
